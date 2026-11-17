@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MQTT broker reachability diagnostic</title>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+</head><body>
+<h3>MQTT broker reachability diagnostic</h3>
+<pre id="out">starting…</pre>
+<script>
+var CANDIDATES=[
+  "wss://broker.emqx.io:8084/mqtt",
+  "wss://test.mosquitto.org:8081/mqtt",
+  "wss://test.mosquitto.org:443/mqtt",
+  "wss://broker.hivemq.com:8884/mqtt",
+  "wss://broker.connectmq.com:8084/mqtt",
+  "wss://mqtt.eclipseprojects.io:443/mqtt"
+];
+var out=document.getElementById("out");
+function log(s){ out.textContent+="\n"+s; }
+function testOne(url){
+  return new Promise(function(resolve){
+    var t0=Date.now(), done=false, client=null;
+    function finish(ok,why){ if(done)return; done=true; try{client&&client.end(true);}catch(e){} log((ok?"CONNECTED ":"FAILED    ")+url+"  ("+(Date.now()-t0)+"ms)"+(why?" — "+why:"")); resolve(ok); }
+    var timer=setTimeout(function(){ finish(false,"timeout 10s"); },10000);
+    try{ client=mqtt.connect(url,{connectTimeout:9000,reconnectPeriod:0,clientId:"diag-"+Math.random().toString(36).slice(2,10)}); }
+    catch(e){ clearTimeout(timer); finish(false,"throw: "+e.message); return; }
+    client.on("connect",function(){ clearTimeout(timer); finish(true); });
+    client.on("error",function(e){ clearTimeout(timer); finish(false,"error: "+(e&&e.message)); });
+  });
+}
+(async function(){
+  out.textContent="mqtt lib loaded: "+(typeof mqtt!=="undefined" && typeof mqtt.connect==="function");
+  for(var i=0;i<CANDIDATES.length;i++){ await testOne(CANDIDATES[i]); }
+  log("ALL DONE");
+})();
+</script>
+</body></html>
